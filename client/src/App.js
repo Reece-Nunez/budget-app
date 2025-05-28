@@ -1,23 +1,20 @@
-import logo from './logo.svg';
-import './App.css';
+// client/src/App.js
+import { useEffect, useState } from "react";
 
 function App() {
+  const [apiMessage, setApiMessage] = useState("");
+
+  useEffect(() => {
+    fetch("http://localhost:5000/")
+      .then((res) => res.json())
+      .then((data) => setApiMessage(data.message))
+      .catch((err) => console.error("API error:", err));
+  }, []);
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      <h1>Monthly Budget App</h1>
+      <p>API says: {apiMessage}</p>
     </div>
   );
 }
