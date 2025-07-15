@@ -69,9 +69,13 @@ export default function MonthlyTable({ selectedMonth, onResetToToday }: Props) {
   }
 
   const actualTotals: Record<string, number> = {}
-  for (const e of expenses.filter((e) => e.date.startsWith(monthKey))) {
+
+expenses
+  .filter(e => e.date.startsWith(monthKey))
+  .forEach(e => {
     actualTotals[e.category] = (actualTotals[e.category] || 0) + e.amount
-  }
+  })
+
 
   return (
     <motion.div

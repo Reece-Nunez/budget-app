@@ -12,6 +12,7 @@ import TransactionsFeed from '@/components/dashboard/TransactionsFeed'
 import AddExpenseModal from '@/components/dashboard/AddExpenseModal'
 import AddIncomeModal from '@/components/dashboard/AddIncomeModal'
 import AddCategoryModal from '@/components/dashboard/AddCategoryModal'
+import AddBudgetModal from '@/components/dashboard/AddBudgetModal'
 
 export default function DashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date())
@@ -24,6 +25,7 @@ export default function DashboardPage() {
           <AddExpenseModal />
           <AddIncomeModal />
           <AddCategoryModal />
+          <AddBudgetModal />
         </div>
       </div>
       <OverviewCards selectedMonth={selectedMonth} />
