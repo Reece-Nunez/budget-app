@@ -1,34 +1,77 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
-
-const monthlyData: Record<string, { category: string; planned: number; actual: number }[]> = {
-  '2025-07': [
-    { category: 'Housing', planned: 1200, actual: 1300 },
-    { category: 'Groceries', planned: 600, actual: 550 },
-    { category: 'Utilities', planned: 300, actual: 310 },
-    { category: 'Transport', planned: 250, actual: 280 },
-    { category: 'Entertainment', planned: 200, actual: 150 },
-  ],
-  '2025-06': [
-    { category: 'Housing', planned: 1200, actual: 1200 },
-    { category: 'Groceries', planned: 650, actual: 640 },
-    { category: 'Utilities', planned: 290, actual: 300 },
-    { category: 'Transport', planned: 240, actual: 260 },
-    { category: 'Entertainment', planned: 180, actual: 210 },
-  ],
-}
+import { Input } from '@/components/ui/input'
+import { useBudget } from '@/lib/budget-store'
+import { supabase } from '@/lib/supaBaseClient'
+import { toast } from 'sonner'
 
 type Props = {
   selectedMonth: Date
   onResetToToday?: () => void
 }
 
+type BudgetRow = {
+  id: string
+  category: string
+  planned: number
+}
+
 export default function MonthlyTable({ selectedMonth, onResetToToday }: Props) {
+  const { expenses } = useBudget()
   const monthKey = format(selectedMonth, 'yyyy-MM')
-  const data = monthlyData[monthKey] ?? monthlyData['2025-07']
+
+  const [budgets, setBudgets] = useState<BudgetRow[]>([])
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editAmount, setEditAmount] = useState<number>(0)
+
+  useEffect(() => {
+    const loadBudgets = async () => {
+      const { data, error } = await supabase
+        .from('budgets')
+        .select('*')
+        .eq('month', monthKey)
+
+      if (!error) setBudgets(data || [])
+    }
+
+    loadBudgets()
+  }, [monthKey])
+
+  const handleSave = async (id: string) => {
+    const { error } = await supabase
+      .from('budgets')
+      .update({ planned: editAmount })
+      .eq('id', id)
+
+    if (!error) {
+      setBudgets((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, planned: editAmount } : b))
+      )
+      toast.success('Updated budget')
+      setEditingId(null)
+    } else {
+      toast.error('Failed to update')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from('budgets').delete().eq('id', id)
+    if (!error) {
+      setBudgets((prev) => prev.filter((b) => b.id !== id))
+      toast.success('Deleted budget')
+    } else {
+      toast.error('Delete failed')
+    }
+  }
+
+  const actualTotals: Record<string, number> = {}
+  for (const e of expenses.filter((e) => e.date.startsWith(monthKey))) {
+    actualTotals[e.category] = (actualTotals[e.category] || 0) + e.amount
+  }
 
   return (
     <motion.div
@@ -53,27 +96,61 @@ export default function MonthlyTable({ selectedMonth, onResetToToday }: Props) {
               <th className="px-6 py-4 font-semibold text-muted-foreground">Planned</th>
               <th className="px-6 py-4 font-semibold text-muted-foreground">Actual</th>
               <th className="px-6 py-4 font-semibold text-muted-foreground">Difference</th>
+              <th className="px-6 py-4 font-semibold text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {data.map((item, index) => {
-              const diff = item.planned - item.actual
+            {budgets.map((b) => {
+              const actual = actualTotals[b.category] || 0
+              const diff = b.planned - actual
               const isPositive = diff >= 0
 
               return (
-                <tr
-                  key={index}
-                  className="border-t hover:bg-accent transition-colors"
-                >
-                  <td className="px-6 py-3 font-medium">{item.category}</td>
-                  <td className="px-6 py-3">${item.planned.toLocaleString()}</td>
-                  <td className="px-6 py-3">${item.actual.toLocaleString()}</td>
+                <tr key={b.id} className="border-t hover:bg-accent transition-colors">
+                  <td className="px-6 py-3 font-medium">{b.category}</td>
+                  <td className="px-6 py-3">
+                    {editingId === b.id ? (
+                      <Input
+                        type="number"
+                        value={editAmount}
+                        onChange={(e) => setEditAmount(Number(e.target.value))}
+                        className="w-24"
+                      />
+                    ) : (
+                      `$${b.planned.toLocaleString()}`
+                    )}
+                  </td>
+                  <td className="px-6 py-3">${actual.toLocaleString()}</td>
                   <td
-                    className={`px-6 py-3 font-semibold ${
-                      isPositive ? 'text-green-600' : 'text-red-500'
-                    }`}
+                    className={`px-6 py-3 font-semibold ${isPositive ? 'text-green-600' : 'text-red-500'
+                      }`}
                   >
                     {isPositive ? '+' : '-'}${Math.abs(diff).toLocaleString()}
+                  </td>
+                  <td className="px-6 py-3 space-x-2">
+                    {editingId === b.id ? (
+                      <Button size="sm" onClick={() => handleSave(b.id)}>
+                        Save
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditAmount(b.planned)
+                          setEditingId(b.id)
+                        }}
+                      >
+                        Edit
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDelete(b.id)}
+                    >
+                      Delete
+                    </Button>
                   </td>
                 </tr>
               )

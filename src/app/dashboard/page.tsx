@@ -11,6 +11,7 @@ import RecurringBills from '@/components/dashboard/RecurringBills'
 import TransactionsFeed from '@/components/dashboard/TransactionsFeed'
 import AddExpenseModal from '@/components/dashboard/AddExpenseModal'
 import AddIncomeModal from '@/components/dashboard/AddIncomeModal'
+import AddCategoryModal from '@/components/dashboard/AddCategoryModal'
 
 export default function DashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date())
@@ -22,6 +23,7 @@ export default function DashboardPage() {
         <div className="flex gap-2">
           <AddExpenseModal />
           <AddIncomeModal />
+          <AddCategoryModal />
         </div>
       </div>
       <OverviewCards selectedMonth={selectedMonth} />

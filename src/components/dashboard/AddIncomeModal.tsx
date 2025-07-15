@@ -11,27 +11,40 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { Button } from '../ui/button'
+import { useBudget } from '@/lib/budget-store'
 
-export default function AddExpenseModal() {
+export default function AddIncomeModal() {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ source: '', amount: '', date: '' })
+  const { addIncome } = useBudget()
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.source || !form.amount || !form.date) {
       toast.error('Please fill in all fields')
       return
     }
-    toast.success(`Added: ${form.source} - $${form.amount}`)
-    setForm({ source: '', amount: '', date: '' })
-    setOpen(false)
+
+    try {
+      await addIncome({
+        source: form.source.trim(),
+        amount: parseFloat(form.amount),
+        date: form.date,
+      })
+
+      toast.success(`Added: ${form.source} - $${form.amount}`)
+      setForm({ source: '', amount: '', date: '' })
+      setOpen(false)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to save income')
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <button className="rounded bg-green-600 px-4 py-2 text-white hover:bg-blue-700 transition">
-          Add Income
-        </button>
+      <DialogTrigger asChild>
+        <Button>Add Income</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -72,7 +85,6 @@ export default function AddExpenseModal() {
           </button>
         </DialogFooter>
       </DialogContent>
-
     </Dialog>
   )
 }

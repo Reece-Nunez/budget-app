@@ -8,23 +8,33 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-
-const data = [
-  { name: 'Housing', value: 1300 },
-  { name: 'Groceries', value: 550 },
-  { name: 'Utilities', value: 310 },
-  { name: 'Transport', value: 280 },
-  { name: 'Entertainment', value: 150 },
-]
+import { useBudget } from '@/lib/budget-store'
 
 const COLORS = ['#3b82f6', '#f97316', '#10b981', '#8b5cf6', '#ef4444']
 
-interface ExpensePieChartProps {
-  selectedMonth: Date
-}
+export default function ExpensePieChart() {
+  const { expenses, selectedMonth } = useBudget()
 
-export default function ExpensePieChart({ selectedMonth }: ExpensePieChartProps) {
-  const formattedMonth = selectedMonth.toLocaleString('default', {
+  const filtered = expenses.filter((e) => {
+    const expenseDate = new Date(e.date)
+    const selectedMonthDate = new Date(selectedMonth)
+    return (
+      expenseDate.getFullYear() === selectedMonthDate.getFullYear() &&
+      expenseDate.getMonth() === selectedMonthDate.getMonth()
+    )
+  })
+
+  const categories = filtered.reduce((acc, item) => {
+    acc[item.category] = (acc[item.category] || 0) + item.amount
+    return acc
+  }, {} as Record<string, number>)
+
+  const chartData = Object.entries(categories).map(([name, value]) => ({
+    name,
+    value,
+  }))
+
+  const formattedMonth = new Date(`${selectedMonth}-01`).toLocaleDateString('en-US', {
     month: 'long',
     year: 'numeric',
   })
@@ -43,7 +53,7 @@ export default function ExpensePieChart({ selectedMonth }: ExpensePieChartProps)
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={data}
+              data={chartData}
               cx="50%"
               cy="50%"
               labelLine={false}
@@ -52,7 +62,7 @@ export default function ExpensePieChart({ selectedMonth }: ExpensePieChartProps)
               dataKey="value"
               nameKey="name"
             >
-              {data.map((entry, index) => (
+              {chartData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={COLORS[index % COLORS.length]}
@@ -64,7 +74,7 @@ export default function ExpensePieChart({ selectedMonth }: ExpensePieChartProps)
         </ResponsiveContainer>
       </div>
       <ul className="flex flex-wrap justify-center gap-4 mt-6">
-        {data.map((entry, index) => (
+        {chartData.map((entry, index) => (
           <li key={index} className="flex items-center gap-2 text-sm">
             <span
               className="w-3 h-3 rounded-full"
