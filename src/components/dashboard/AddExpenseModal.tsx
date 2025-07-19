@@ -15,11 +15,10 @@ import { Button } from '../ui/button'
 import { useBudget } from '@/lib/budget-store'
 import { supabase } from '@/lib/supaBaseClient'
 
-export default function AddExpenseModal() {
-  const [open, setOpen] = useState(false)
+export default function AddExpenseModal({ open, onClose }: { open: boolean, onClose: () => void }) {
   const [form, setForm] = useState({ category: '', amount: '', date: '' })
 
-  const { addExpense, categories, fetchCategories } = useBudget()
+  const { addExpense, categories, fetchCategories, fetchExpenses } = useBudget()
 
   useEffect(() => {
     if (open) {
@@ -64,8 +63,11 @@ export default function AddExpenseModal() {
       }
 
       toast.success(`Added: ${form.category} - $${form.amount}`)
+      if (fetchExpenses) {
+        await fetchExpenses()
+      }
       setForm({ category: '', amount: '', date: '' })
-      setOpen(false)
+      onClose()
     } catch (err) {
       console.error(err)
       toast.error('Failed to save expense')
@@ -74,7 +76,7 @@ export default function AddExpenseModal() {
 
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(state) => !state && onClose()}>
       <DialogTrigger asChild>
         <Button>Add Expense</Button>
       </DialogTrigger>

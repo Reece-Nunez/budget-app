@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { useBudget } from '@/lib/budget-store'
 import { supabase } from '@/lib/supaBaseClient'
 import { toast } from 'sonner'
+import { useCallback } from 'react'
+
 
 type Props = {
   selectedMonth: Date
@@ -21,25 +23,28 @@ type BudgetRow = {
 }
 
 export default function MonthlyTable({ selectedMonth, onResetToToday }: Props) {
-  const { expenses } = useBudget()
+  const { expenses, fetchExpenses } = useBudget()
   const monthKey = format(selectedMonth, 'yyyy-MM')
 
   const [budgets, setBudgets] = useState<BudgetRow[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editAmount, setEditAmount] = useState<number>(0)
 
-  useEffect(() => {
-    const loadBudgets = async () => {
-      const { data, error } = await supabase
-        .from('budgets')
-        .select('*')
-        .eq('month', monthKey)
 
-      if (!error) setBudgets(data || [])
-    }
+  const loadBudgets = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('budgets')
+      .select('*')
+      .eq('month', monthKey)
 
-    loadBudgets()
+    if (!error) setBudgets(data || [])
+    else toast.error('Failed to fetch budgets')
   }, [monthKey])
+
+  useEffect(() => {
+    loadBudgets()
+  }, [loadBudgets])
+
 
   const handleSave = async (id: string) => {
     const { error } = await supabase
@@ -48,10 +53,9 @@ export default function MonthlyTable({ selectedMonth, onResetToToday }: Props) {
       .eq('id', id)
 
     if (!error) {
-      setBudgets((prev) =>
-        prev.map((b) => (b.id === id ? { ...b, planned: editAmount } : b))
-      )
       toast.success('Updated budget')
+      await loadBudgets()
+      await fetchExpenses?.()
       setEditingId(null)
     } else {
       toast.error('Failed to update')
@@ -61,20 +65,22 @@ export default function MonthlyTable({ selectedMonth, onResetToToday }: Props) {
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('budgets').delete().eq('id', id)
     if (!error) {
-      setBudgets((prev) => prev.filter((b) => b.id !== id))
       toast.success('Deleted budget')
+      await loadBudgets()
+      await fetchExpenses?.()
     } else {
       toast.error('Delete failed')
     }
   }
 
+
   const actualTotals: Record<string, number> = {}
 
-expenses
-  .filter(e => e.date.startsWith(monthKey))
-  .forEach(e => {
-    actualTotals[e.category] = (actualTotals[e.category] || 0) + e.amount
-  })
+  expenses
+    .filter(e => e.date.startsWith(monthKey))
+    .forEach(e => {
+      actualTotals[e.category] = (actualTotals[e.category] || 0) + e.amount
+    })
 
 
   return (

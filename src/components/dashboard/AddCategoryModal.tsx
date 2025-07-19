@@ -1,21 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
     Dialog, DialogTrigger, DialogContent,
     DialogHeader, DialogFooter, DialogTitle, DialogDescription
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { useBudget } from '@/lib/budget-store'
 import { supabase } from '@/lib/supaBaseClient'
 
-export default function AddCategoryModal() {
-    const [open, setOpen] = useState(false)
+export default function AddCategoryModal({ open, onClose }: { open: boolean, onClose: () => void }) {
     const [form, setForm] = useState({ name: '', type: 'expense' })
 
-    const { addCategory } = useBudget()
+    const [categories, setCategories] = useState<{ name: string; type: string }[]>([])
 
+    useEffect(() => {
+        const fetchCategories = async () => {
+            const { data, error } = await supabase.from('categories').select('name, type')
+            if (!error && data) {
+                setCategories(data)
+            }
+        }
+
+        if (open) fetchCategories()
+    }, [open])
     const handleSubmit = async () => {
         if (!form.name || !form.type) {
             toast.error('Please fill in all fields')
@@ -43,7 +51,7 @@ export default function AddCategoryModal() {
 
             toast.success(`Category "${form.name}" added`)
             setForm({ name: '', type: 'expense' })
-            setOpen(false)
+            onClose()
         } catch (err) {
             console.error(err)
             toast.error('Add category function is not available')
@@ -52,7 +60,7 @@ export default function AddCategoryModal() {
 
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(state) => !state && onClose()}>
             <DialogTrigger asChild>
                 <Button variant="outline">Add Category</Button>
             </DialogTrigger>
@@ -80,6 +88,30 @@ export default function AddCategoryModal() {
                         <option value="income">Income</option>
                     </select>
                 </div>
+                <div className="mt-4 border-t pt-3">
+                    <p className="text-sm font-semibold mb-2 text-muted-foreground">Existing Categories:</p>
+                    <div className="max-h-32 overflow-y-auto space-y-1 text-sm">
+                        {categories.length === 0 ? (
+                            <p className="text-muted-foreground italic">No categories yet.</p>
+                        ) : (
+                            <>
+                                {['expense', 'income'].map((type) => (
+                                    <div key={type}>
+                                        <p className="font-medium text-muted-foreground mt-2">{type === 'expense' ? 'Expenses' : 'Income'}:</p>
+                                        <ul className="list-disc ml-5">
+                                            {categories
+                                                .filter((c) => c.type === type)
+                                                .map((cat, idx) => (
+                                                    <li key={idx}>{cat.name}</li>
+                                                ))}
+                                        </ul>
+                                    </div>
+                                ))}
+                            </>
+                        )}
+                    </div>
+                </div>
+
 
                 <DialogFooter>
                     <Button onClick={handleSubmit}>Save</Button>

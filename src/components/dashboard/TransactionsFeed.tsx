@@ -2,25 +2,9 @@
 
 import { motion } from 'framer-motion'
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
-import { format, parse } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { Button } from '@/components/ui/button'
-
-const allTransactions: Record<string, { type: 'Income' | 'Expense'; source: string; amount: number; date: string }[]> = {
-  '2025-07': [
-    { type: 'Income', source: 'Freelance Project', amount: 1200, date: 'Jul 5' },
-    { type: 'Expense', source: 'Groceries', amount: 130, date: 'Jul 6' },
-    { type: 'Expense', source: 'Gas Station', amount: 45, date: 'Jul 8' },
-    { type: 'Income', source: 'Paycheck', amount: 2500, date: 'Jul 10' },
-    { type: 'Expense', source: 'Dining Out', amount: 65, date: 'Jul 11' },
-  ],
-  '2025-06': [
-    { type: 'Income', source: 'Freelance Project', amount: 1000, date: 'Jun 4' },
-    { type: 'Expense', source: 'Groceries', amount: 140, date: 'Jun 6' },
-    { type: 'Income', source: 'Paycheck', amount: 2400, date: 'Jun 10' },
-    { type: 'Expense', source: 'Gas Station', amount: 50, date: 'Jun 12' },
-    { type: 'Expense', source: 'Streaming', amount: 20, date: 'Jun 15' },
-  ],
-}
+import { useBudget } from '@/lib/budget-store'
 
 type Props = {
   selectedMonth: Date
@@ -28,8 +12,33 @@ type Props = {
 }
 
 export default function TransactionsFeed({ selectedMonth, onResetToToday }: Props) {
+  const { income, expenses } = useBudget()
   const monthKey = format(selectedMonth, 'yyyy-MM')
-  const transactions = allTransactions[monthKey] ?? []
+
+  // Combine and format both income and expenses
+  const combined = [
+    ...income
+      .filter((i) => i.date.startsWith(monthKey))
+      .map((i) => ({
+        type: 'Income' as const,
+        source: i.source || 'Income',
+        amount: i.amount,
+        date: format(parseISO(i.date), 'MMM d'),
+      })),
+    ...expenses
+      .filter((e) => e.date.startsWith(monthKey))
+      .map((e) => ({
+        type: 'Expense' as const,
+        source: e.category || 'Expense',
+        amount: e.amount,
+        date: format(parseISO(e.date), 'MMM d'),
+      })),
+  ]
+
+  // Sort by date descending (latest first)
+  const transactions = combined.sort(
+    (a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()
+  )
 
   return (
     <motion.div
@@ -67,10 +76,7 @@ export default function TransactionsFeed({ selectedMonth, onResetToToday }: Prop
                     <p className="text-sm text-muted-foreground">{item.date}</p>
                   </div>
                 </div>
-                <p
-                  className={`font-semibold text-sm ${isIncome ? 'text-green-600' : 'text-red-600'
-                    }`}
-                >
+                <p className={`font-semibold text-sm ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
                   {isIncome ? '+' : '-'}${item.amount.toLocaleString()}
                 </p>
               </li>

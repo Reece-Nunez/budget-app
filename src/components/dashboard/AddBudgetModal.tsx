@@ -16,15 +16,14 @@ import { useBudget } from '@/lib/budget-store'
 import { supabase } from '@/lib/supaBaseClient'
 import { format } from 'date-fns'
 
-export default function AddBudgetModal() {
-  const [open, setOpen] = useState(false)
+export default function AddBudgetModal({ open, onClose }: { open: boolean, onClose: () => void }) {
   const [form, setForm] = useState({
     category: '',
     planned: '',
     month: format(new Date(), 'yyyy-MM'),
   })
 
-  const { categories, fetchCategories } = useBudget()
+  const { categories, fetchCategories, fetchBudgets } = useBudget()
 
   useEffect(() => {
     if (open && fetchCategories) fetchCategories()
@@ -61,8 +60,11 @@ export default function AddBudgetModal() {
       if (error) throw error
 
       toast.success(`Budget set for ${form.category} – $${form.planned}`)
+      if (fetchBudgets) {
+        await fetchBudgets()
+      }
       setForm({ category: '', planned: '', month: format(new Date(), 'yyyy-MM') })
-      setOpen(false)
+      onClose()
     } catch (err) {
       console.error(err)
       toast.error('Failed to set budget')
@@ -70,7 +72,7 @@ export default function AddBudgetModal() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(state) => !state && onClose()}>
       <DialogTrigger asChild>
         <Button variant="outline">Add Budget</Button>
       </DialogTrigger>

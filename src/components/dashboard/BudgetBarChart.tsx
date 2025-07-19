@@ -1,28 +1,19 @@
-// src/components/dashboard/BudgetBarChart.tsx
 'use client'
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { useEffect, useState } from 'react'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts'
 import { motion } from 'framer-motion'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
-import { useRouter, useSearchParams } from 'next/navigation'
-
-const monthlyChartData: Record<string, { category: string; planned: number; actual: number }[]> = {
-  '2025-07': [
-    { category: 'Housing', planned: 1200, actual: 1300 },
-    { category: 'Groceries', planned: 600, actual: 550 },
-    { category: 'Utilities', planned: 300, actual: 310 },
-    { category: 'Transport', planned: 250, actual: 280 },
-    { category: 'Entertainment', planned: 200, actual: 150 },
-  ],
-  '2025-06': [
-    { category: 'Housing', planned: 1200, actual: 1200 },
-    { category: 'Groceries', planned: 650, actual: 640 },
-    { category: 'Utilities', planned: 290, actual: 300 },
-    { category: 'Transport', planned: 240, actual: 260 },
-    { category: 'Entertainment', planned: 180, actual: 210 },
-  ],
-}
+import { useBudget } from '@/lib/budget-store'
 
 type Props = {
   selectedMonth: Date
@@ -30,8 +21,29 @@ type Props = {
 }
 
 export default function BudgetBarChart({ selectedMonth, onResetToToday }: Props) {
+  const { expenses, budgets } = useBudget()
+  type ChartData = { category: string; planned: number; actual: number }
+  const [chartData, setChartData] = useState<ChartData[]>([])
   const monthKey = format(selectedMonth, 'yyyy-MM')
-  const data = monthlyChartData[monthKey] ?? []
+
+  useEffect(() => {
+    const monthBudgets = budgets?.filter(b => b.month === monthKey) ?? []
+
+    const actualMap = expenses
+      .filter(e => e.date.startsWith(monthKey))
+      .reduce((acc, curr) => {
+        acc[curr.category] = (acc[curr.category] || 0) + curr.amount
+        return acc
+      }, {} as Record<string, number>)
+
+    const combined = monthBudgets.map(budget => ({
+      category: budget.category,
+      planned: budget.planned,
+      actual: actualMap[budget.category] || 0,
+    }))
+
+    setChartData(combined)
+  }, [expenses, budgets, monthKey])
 
   return (
     <motion.div
@@ -48,14 +60,19 @@ export default function BudgetBarChart({ selectedMonth, onResetToToday }: Props)
           </Button>
         )}
       </div>
-      {data.length === 0 ? (
+
+      {chartData.length === 0 ? (
         <div className="text-muted-foreground">No data available for {monthKey}</div>
       ) : (
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data}>
+          <BarChart data={chartData}>
             <XAxis dataKey="category" />
             <YAxis />
-            <Tooltip />
+            <Tooltip
+              formatter={(value: number) =>
+                `$${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+              }
+            />
             <Legend />
             <Bar dataKey="planned" fill="#3b82f6" name="Planned" />
             <Bar dataKey="actual" fill="#ef4444" name="Actual" />

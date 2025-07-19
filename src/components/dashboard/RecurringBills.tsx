@@ -1,48 +1,93 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
-import { format } from 'date-fns'
+import { format, isBefore, addDays, setDate } from 'date-fns'
 import { Button } from '@/components/ui/button'
-
-const billsByMonth: Record<string, { name: string; amount: number; due: string; status: string }[]> = {
-  '2025-07': [
-    { name: 'Rent', amount: 1200, due: 'Jul 1', status: 'Paid' },
-    { name: 'Electric', amount: 95, due: 'Jul 7', status: 'Due Soon' },
-    { name: 'Phone', amount: 45, due: 'Jul 12', status: 'Unpaid' },
-    { name: 'Internet', amount: 70, due: 'Jul 15', status: 'Paid' },
-    { name: 'Water', amount: 35, due: 'Jul 20', status: 'Due Soon' },
-  ],
-  '2025-06': [
-    { name: 'Rent', amount: 1200, due: 'Jun 1', status: 'Paid' },
-    { name: 'Electric', amount: 100, due: 'Jun 7', status: 'Paid' },
-    { name: 'Phone', amount: 45, due: 'Jun 12', status: 'Paid' },
-    { name: 'Internet', amount: 70, due: 'Jun 15', status: 'Paid' },
-    { name: 'Water', amount: 35, due: 'Jun 20', status: 'Paid' },
-  ],
-}
-
-const getStatusVariant = (status: string): "outline" | "destructive" | "default" | "secondary" => {
-  switch (status) {
-    case 'Paid':
-      return 'secondary'
-    case 'Due Soon':
-      return 'outline'
-    case 'Unpaid':
-      return 'destructive'
-    default:
-      return 'default'
-  }
-}
+import { useBudget } from '@/lib/budget-store'
+import { supabase } from '@/lib/supaBaseClient'
 
 type Props = {
   selectedMonth: Date
   onResetToToday?: () => void
 }
 
+type RecurringBill = {
+  id: string
+  name: string
+  amount: number
+  due_day: number
+}
+
+type BillDisplay = {
+  name: string
+  amount: number
+  due: string
+  status: 'Paid' | 'Due Soon' | 'Unpaid'
+}
+
 export default function RecurringBills({ selectedMonth, onResetToToday }: Props) {
+  const { expenses } = useBudget()
+  const [recurringBills, setRecurringBills] = useState<BillDisplay[]>([])
+
   const monthKey = format(selectedMonth, 'yyyy-MM')
-  const bills = billsByMonth[monthKey] ?? []
+
+  useEffect(() => {
+    const now = new Date()
+    const fetchRecurringBills = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const userId = user?.id || user?.id
+      if (!userId) return
+
+      const { data: recurring, error } = await supabase
+        .from('recurring_bills')
+        .select('*')
+        .eq('user_id', userId)
+
+      if (error || !recurring) return
+
+      const display: BillDisplay[] = recurring.map((bill: RecurringBill) => {
+        const dueDate = setDate(selectedMonth, bill.due_day)
+        const paid = expenses.some(
+          (e) => e.date.startsWith(monthKey) && e.category === bill.name
+        )
+
+        let status: 'Paid' | 'Due Soon' | 'Unpaid' = 'Unpaid'
+        if (paid) {
+          status = 'Paid'
+        } else if (isBefore(dueDate, addDays(now, 5)) && isBefore(now, dueDate)) {
+          status = 'Due Soon'
+        }
+
+        return {
+          name: bill.name,
+          amount: bill.amount,
+          due: format(dueDate, 'MMM d'),
+          status,
+        }
+      })
+
+      setRecurringBills(display)
+    }
+    fetchRecurringBills()
+  }, [selectedMonth, expenses, monthKey])
+
+
+  const getStatusVariant = (
+    status: 'Paid' | 'Due Soon' | 'Unpaid'
+  ): 'outline' | 'destructive' | 'default' | 'secondary' => {
+    switch (status) {
+      case 'Paid':
+        return 'secondary'
+      case 'Due Soon':
+        return 'outline'
+      case 'Unpaid':
+        return 'destructive'
+      default:
+        return 'default'
+    }
+  }
 
   return (
     <motion.div
@@ -59,11 +104,12 @@ export default function RecurringBills({ selectedMonth, onResetToToday }: Props)
           </Button>
         )}
       </div>
-      {bills.length === 0 ? (
-        <div className="text-muted-foreground">No bills for {monthKey}</div>
+
+      {recurringBills.length === 0 ? (
+        <div className="text-muted-foreground">No recurring bills set up</div>
       ) : (
         <ul className="space-y-3">
-          {bills.map((bill, index) => (
+          {recurringBills.map((bill, index) => (
             <li
               key={index}
               className="flex items-center justify-between border-b pb-2 last:border-none"
@@ -76,9 +122,7 @@ export default function RecurringBills({ selectedMonth, onResetToToday }: Props)
                 <span className="text-sm font-semibold">
                   ${bill.amount.toLocaleString()}
                 </span>
-                <Badge variant={getStatusVariant(bill.status)}>
-                  {bill.status}
-                </Badge>
+                <Badge variant={getStatusVariant(bill.status)}>{bill.status}</Badge>
               </div>
             </li>
           ))}

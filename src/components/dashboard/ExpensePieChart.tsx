@@ -80,7 +80,9 @@ export default function ExpensePieChart({ selectedMonth, onResetToToday }: Props
                     />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip
+                  formatter={(value: number) => [`$${value.toFixed(2)}`, 'Amount']}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>

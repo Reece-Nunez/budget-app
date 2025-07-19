@@ -24,6 +24,13 @@ type Category = {
   user_id?: string
 }
 
+export type Budget = {
+  id: string
+  category: string
+  planned: number
+  month: string
+}
+
 type BudgetContextType = {
   selectedMonth: string
   setSelectedMonth: (month: string) => void
@@ -34,6 +41,11 @@ type BudgetContextType = {
   categories?: Category[]
   fetchCategories?: () => Promise<void>
   addCategory?: (data: Omit<Category, 'id'>) => Promise<void>
+  fetchExpenses?: () => Promise<void>
+  fetchIncome?: () => Promise<void>
+  fetchBudgets?: () => Promise<void>
+  setBudgets?: (budgets: Budget[]) => void
+  budgets?: Budget[]
 }
 
 const BudgetContext = createContext<BudgetContextType | undefined>(undefined)
@@ -47,6 +59,27 @@ export const BudgetProvider = ({ children }: { children: React.ReactNode }) => {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [income, setIncome] = useState<Income[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [budgets, setBudgets] = useState<Budget[]>([])
+
+  const fetchExpenses = async () => {
+    const { data } = await supabase.from('expenses').select('*')
+    if (data) setExpenses(data as Expense[])
+  }
+
+  const fetchIncome = async () => {
+    const { data, error } = await supabase.from('income').select('*').order('date', { ascending: false })
+    if (error) {
+      console.error('Error fetching income:', error)
+      return
+    }
+    if (data) setIncome(data as Income[])
+  }
+
+  const fetchBudgets = async () => {
+    const { data } = await supabase.from('budgets').select('*')
+    if (data) setBudgets(data as Budget[])
+  }
+
 
   const fetchCategories = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -112,12 +145,30 @@ export const BudgetProvider = ({ children }: { children: React.ReactNode }) => {
     const { data: inserted, error } = await supabase.from('income').insert([data])
     if (!error && inserted) {
       setIncome((prev) => [...prev, ...(inserted as Income[])])
+      await fetchIncome()
     }
   }
 
+
+
   return (
     <BudgetContext.Provider
-      value={{ selectedMonth, setSelectedMonth, expenses, addExpense, income, addIncome, categories, fetchCategories, addCategory }}
+      value={{ 
+        selectedMonth, 
+        setSelectedMonth, 
+        expenses, 
+        addExpense, 
+        income, 
+        addIncome, 
+        categories, 
+        fetchCategories, 
+        addCategory, 
+        fetchExpenses, 
+        fetchIncome, 
+        fetchBudgets,
+        setBudgets,
+        budgets,
+      }}
     >
       {children}
     </BudgetContext.Provider>

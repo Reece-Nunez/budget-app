@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogTrigger,
@@ -13,11 +13,27 @@ import {
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { useBudget } from '@/lib/budget-store'
+import { supabase } from '@/lib/supaBaseClient'
 
-export default function AddIncomeModal() {
-  const [open, setOpen] = useState(false)
+export default function AddIncomeModal({ open, onClose }: { open: boolean, onClose: () => void }) {
   const [form, setForm] = useState({ source: '', amount: '', date: '' })
   const { addIncome } = useBudget()
+  const [incomeCategories, setIncomeCategories] = useState<string[]>([])
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('name')
+        .eq('type', 'income')
+
+      if (!error && data) {
+        setIncomeCategories(data.map((cat) => cat.name))
+      }
+    }
+
+    if (open) fetchCategories()
+  }, [open])
 
   const handleSubmit = async () => {
     if (!form.source || !form.amount || !form.date) {
@@ -34,7 +50,7 @@ export default function AddIncomeModal() {
 
       toast.success(`Added: ${form.source} - $${form.amount}`)
       setForm({ source: '', amount: '', date: '' })
-      setOpen(false)
+      onClose()
     } catch (err) {
       console.error(err)
       toast.error('Failed to save income')
@@ -42,7 +58,7 @@ export default function AddIncomeModal() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(state) => !state && onClose()}>
       <DialogTrigger asChild>
         <Button>Add Income</Button>
       </DialogTrigger>
@@ -55,12 +71,19 @@ export default function AddIncomeModal() {
         </DialogHeader>
 
         <div className="space-y-3">
-          <input
+          <select
             className="w-full border border-gray-300 rounded p-2"
-            placeholder="Source"
             value={form.source}
             onChange={(e) => setForm({ ...form, source: e.target.value })}
-          />
+          >
+            <option value="">Select Income Category</option>
+            {incomeCategories.map((cat, i) => (
+              <option key={i} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+
           <input
             className="w-full border border-gray-300 rounded p-2"
             type="number"
