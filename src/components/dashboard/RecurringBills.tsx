@@ -7,6 +7,7 @@ import { format, isBefore, addDays, setDate } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { useBudget } from '@/lib/budget-store'
 import { supabase } from '@/lib/supaBaseClient'
+import { Switch } from '@/components/ui/switch'
 
 type Props = {
   selectedMonth: Date
@@ -18,13 +19,16 @@ type RecurringBill = {
   name: string
   amount: number
   due_day: number
+  is_active: boolean
 }
 
 type BillDisplay = {
+  id: string
   name: string
   amount: number
   due: string
   status: 'Paid' | 'Due Soon' | 'Unpaid'
+  is_active: boolean
 }
 
 export default function RecurringBills({ selectedMonth, onResetToToday }: Props) {
@@ -34,18 +38,31 @@ export default function RecurringBills({ selectedMonth, onResetToToday }: Props)
   const monthKey = format(selectedMonth, 'yyyy-MM')
 
   useEffect(() => {
-    const now = new Date()
-    const fetchRecurringBills = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      const userId = user?.id || user?.id
-      if (!userId) return
+    const fetchBills = async () => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      const userId = user?.id
+      if (userError || !userId) {
+        console.error('No user found:', userError)
+        return
+      }
 
       const { data: recurring, error } = await supabase
         .from('recurring_bills')
         .select('*')
         .eq('user_id', userId)
 
-      if (error || !recurring) return
+      console.log('Fetched recurring bills:', recurring)
+      if (error) {
+        console.error('Supabase error:', error)
+        return
+      }
+
+      if (!recurring || recurring.length === 0) {
+        console.warn('No recurring bills returned for user:', userId)
+        return
+      }
+
+      const now = new Date()
 
       const display: BillDisplay[] = recurring.map((bill: RecurringBill) => {
         const dueDate = setDate(selectedMonth, bill.due_day)
@@ -61,18 +78,37 @@ export default function RecurringBills({ selectedMonth, onResetToToday }: Props)
         }
 
         return {
+          id: bill.id,
           name: bill.name,
           amount: bill.amount,
           due: format(dueDate, 'MMM d'),
           status,
+          is_active: bill.is_active ?? true,
         }
       })
 
+      console.log('Display-ready recurring bills:', display)
       setRecurringBills(display)
     }
-    fetchRecurringBills()
+
+    fetchBills()
   }, [selectedMonth, expenses, monthKey])
 
+
+  const toggleActive = async (id: string, value: boolean) => {
+    const { error } = await supabase
+      .from('recurring_bills')
+      .update({ is_active: value })
+      .eq('id', id)
+
+    if (!error) {
+      setRecurringBills((prev) =>
+        prev.map((bill) =>
+          bill.id === id ? { ...bill, is_active: value } : bill
+        )
+      )
+    }
+  }
 
   const getStatusVariant = (
     status: 'Paid' | 'Due Soon' | 'Unpaid'
@@ -87,6 +123,10 @@ export default function RecurringBills({ selectedMonth, onResetToToday }: Props)
       default:
         return 'default'
     }
+  }
+
+  function cn(...classes: (string | boolean | undefined | null)[]): string {
+    return classes.filter(Boolean).join(' ')
   }
 
   return (
@@ -104,29 +144,47 @@ export default function RecurringBills({ selectedMonth, onResetToToday }: Props)
           </Button>
         )}
       </div>
+      <div className="grid grid-cols-4 gap-4 font-medium text-sm text-muted-foreground mb-3 px-2">
+        <div className="text-left">Bill</div>
+        <div className="text-left">Amount</div>
+        <div className="text-left">Status</div>
+        <div className="text-right">Active</div>
+      </div>
+
 
       {recurringBills.length === 0 ? (
         <div className="text-muted-foreground">No recurring bills set up</div>
       ) : (
+
         <ul className="space-y-3">
-          {recurringBills.map((bill, index) => (
+          {recurringBills.map((bill) => (
             <li
-              key={index}
-              className="flex items-center justify-between border-b pb-2 last:border-none"
+              key={bill.id}
+              className={cn(
+                'grid grid-cols-4 gap-4 items-center border-b border-muted pb-3 last:border-none px-2',
+                !bill.is_active && 'opacity-50 italic'
+              )}
             >
-              <div>
-                <p className="font-medium">{bill.name}</p>
-                <p className="text-sm text-muted-foreground">Due {bill.due}</p>
+              <div className="flex flex-col">
+                <span className="font-medium">{bill.name}</span>
+                <span className="text-xs text-muted-foreground">Due {bill.due}</span>
               </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-semibold">
-                  ${bill.amount.toLocaleString()}
-                </span>
+              <div className="text-sm font-semibold">
+                ${bill.amount.toLocaleString()}
+              </div>
+              <div>
                 <Badge variant={getStatusVariant(bill.status)}>{bill.status}</Badge>
+              </div>
+              <div className="flex justify-end">
+                <Switch
+                  checked={bill.is_active}
+                  onCheckedChange={(val) => toggleActive(bill.id, val)}
+                />
               </div>
             </li>
           ))}
         </ul>
+
       )}
     </motion.div>
   )

@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supaBaseClient'
 import { format } from 'date-fns'
 
 export default function AddBudgetModal({ open, onClose }: { open: boolean, onClose: () => void }) {
+  
   const [form, setForm] = useState({
     category: '',
     planned: '',

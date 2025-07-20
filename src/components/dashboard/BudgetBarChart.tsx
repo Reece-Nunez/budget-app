@@ -42,11 +42,6 @@ export default function BudgetBarChart({ selectedMonth, onResetToToday }: Props)
       actual: actualMap[budget.category] || 0,
     }))
 
-    console.log('monthKey:', monthKey)
-    console.log('Filtered Budgets:', monthBudgets)
-    console.log('Filtered Expenses:', actualMap)
-    console.log('Combined Chart Data:', combined)
-
     setChartData(combined)
   }, [expenses, budgets, monthKey])
 

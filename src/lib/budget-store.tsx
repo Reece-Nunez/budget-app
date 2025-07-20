@@ -31,6 +31,16 @@ export type Budget = {
   month: string
 }
 
+export type RecurringBill = {
+  id: string
+  name: string
+  amount: number
+  due_day: number
+  category: string
+  user_id?: string
+  is_active: boolean
+}
+
 type BudgetContextType = {
   selectedMonth: string
   setSelectedMonth: (month: string) => void
@@ -46,11 +56,16 @@ type BudgetContextType = {
   fetchBudgets?: () => Promise<void>
   setBudgets?: (budgets: Budget[]) => void
   budgets?: Budget[]
+  addRecurringBill?: (data: Omit<RecurringBill, 'id'>) => Promise<void>
+  recurringBills?: RecurringBill[]
+  fetchRecurringBills?: () => Promise<void>
+  setRecurringBills?: (bills: RecurringBill[]) => void
 }
 
 const BudgetContext = createContext<BudgetContextType | undefined>(undefined)
 
 export const BudgetProvider = ({ children }: { children: React.ReactNode }) => {
+
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -60,6 +75,17 @@ export const BudgetProvider = ({ children }: { children: React.ReactNode }) => {
   const [income, setIncome] = useState<Income[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
+  const [recurringBills, setRecurringBills] = useState<RecurringBill[]>([])
+
+  const fetchRecurringBills = async () => {
+    const { data, error } = await supabase.from('recurring_bills').select('*')
+    if (error) {
+      console.error('Error fetching recurring bills:', error)
+      return
+    }
+    if (data) setRecurringBills(data as RecurringBill[])
+  }
+
 
   const fetchExpenses = async () => {
     const { data } = await supabase.from('expenses').select('*')
@@ -82,6 +108,10 @@ export const BudgetProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     fetchBudgets()
+    fetchExpenses()
+    fetchIncome()
+    fetchCategories()
+    fetchRecurringBills()
   }, [])
 
 
@@ -153,7 +183,22 @@ export const BudgetProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }
 
+  const addRecurringBill = async (data: Omit<RecurringBill, 'id'>) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
+    if (!userId) throw new Error("User not authenticated")
 
+    const { data: inserted, error } = await supabase
+      .from('recurring_bills')
+      .insert([{ ...data, id: crypto.randomUUID(), user_id: userId }])
+      .select()
+
+    if (!error && inserted) {
+      setRecurringBills(prev => [...prev, inserted[0]])
+    } else {
+      throw error
+    }
+  }
 
   return (
     <BudgetContext.Provider
@@ -172,6 +217,9 @@ export const BudgetProvider = ({ children }: { children: React.ReactNode }) => {
         fetchBudgets,
         setBudgets,
         budgets,
+        recurringBills,
+        addRecurringBill,
+        fetchRecurringBills,
       }}
     >
       {children}

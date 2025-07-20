@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogTrigger,
@@ -13,6 +13,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supaBaseClient'
+import { Switch } from '@/components/ui/switch'
+import { useBudget } from '@/lib/budget-store'
 
 export default function AddRecurringBillModal({
   open,
@@ -21,8 +23,20 @@ export default function AddRecurringBillModal({
   open: boolean
   onClose: () => void
 }) {
-  const [form, setForm] = useState({ name: '', amount: '', due_day: '' })
+  const [form, setForm] = useState({
+    name: '',
+    amount: '',
+    due_day: '',
+    category: '',
+    is_active: true,
+  })
+
   const [loading, setLoading] = useState(false)
+  const { categories, fetchCategories } = useBudget()
+
+  useEffect(() => {
+    if (open && fetchCategories) fetchCategories()
+  }, [open, fetchCategories])
 
   const handleSubmit = async () => {
     if (!form.name || !form.amount || !form.due_day) {
@@ -50,13 +64,21 @@ export default function AddRecurringBillModal({
         name: form.name.trim(),
         amount: parseFloat(form.amount),
         due_day: dueDayNum,
+        category: form.category || null,
+        is_active: form.is_active,
         user_id: user.id,
       })
 
       if (error) throw error
 
       toast.success(`Recurring bill "${form.name}" added`)
-      setForm({ name: '', amount: '', due_day: '' })
+      setForm({
+        name: '',
+        amount: '',
+        due_day: '',
+        category: '',
+        is_active: true,
+      })
       onClose()
     } catch (err) {
       console.error(err)
@@ -100,6 +122,29 @@ export default function AddRecurringBillModal({
             value={form.due_day}
             onChange={(e) => setForm({ ...form, due_day: e.target.value })}
           />
+
+          <select
+            className="w-full border rounded p-2"
+            value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+          >
+            <option value="">Select Category (optional)</option>
+            {categories
+              ?.filter((c) => c.type === 'expense')
+              .map((cat) => (
+                <option key={cat.id} value={cat.name}>
+                  {cat.name}
+                </option>
+              ))}
+          </select>
+
+          <div className="flex items-center justify-between">
+            <span>Is Active</span>
+            <Switch
+              checked={form.is_active}
+              onCheckedChange={(val) => setForm({ ...form, is_active: val })}
+            />
+          </div>
         </div>
 
         <DialogFooter>
