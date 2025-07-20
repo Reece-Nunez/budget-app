@@ -80,6 +80,10 @@ export const BudgetProvider = ({ children }: { children: React.ReactNode }) => {
     if (data) setBudgets(data as Budget[])
   }
 
+  useEffect(() => {
+    fetchBudgets()
+  }, [])
+
 
   const fetchCategories = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -153,18 +157,18 @@ export const BudgetProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <BudgetContext.Provider
-      value={{ 
-        selectedMonth, 
-        setSelectedMonth, 
-        expenses, 
-        addExpense, 
-        income, 
-        addIncome, 
-        categories, 
-        fetchCategories, 
-        addCategory, 
-        fetchExpenses, 
-        fetchIncome, 
+      value={{
+        selectedMonth,
+        setSelectedMonth,
+        expenses,
+        addExpense,
+        income,
+        addIncome,
+        categories,
+        fetchCategories,
+        addCategory,
+        fetchExpenses,
+        fetchIncome,
         fetchBudgets,
         setBudgets,
         budgets,

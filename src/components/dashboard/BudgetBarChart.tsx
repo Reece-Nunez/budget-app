@@ -28,13 +28,13 @@ export default function BudgetBarChart({ selectedMonth, onResetToToday }: Props)
 
   useEffect(() => {
     const monthBudgets = budgets?.filter(b => b.month === monthKey) ?? []
-
     const actualMap = expenses
-      .filter(e => e.date.startsWith(monthKey))
+      .filter(e => format(new Date(e.date), 'yyyy-MM') === monthKey)
       .reduce((acc, curr) => {
         acc[curr.category] = (acc[curr.category] || 0) + curr.amount
         return acc
       }, {} as Record<string, number>)
+
 
     const combined = monthBudgets.map(budget => ({
       category: budget.category,
@@ -42,8 +42,14 @@ export default function BudgetBarChart({ selectedMonth, onResetToToday }: Props)
       actual: actualMap[budget.category] || 0,
     }))
 
+    console.log('monthKey:', monthKey)
+    console.log('Filtered Budgets:', monthBudgets)
+    console.log('Filtered Expenses:', actualMap)
+    console.log('Combined Chart Data:', combined)
+
     setChartData(combined)
   }, [expenses, budgets, monthKey])
+
 
   return (
     <motion.div
