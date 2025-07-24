@@ -56,7 +56,7 @@ export default function Login({ toggle }: { toggle: () => void }) {
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
+                redirectTo: `${window.location.origin}/payment`,
             },
         })
 
@@ -65,7 +65,6 @@ export default function Login({ toggle }: { toggle: () => void }) {
         } else {
             toast('Redirecting to Google...')
         }
-        router.push('/dashboard')
     }
 
     return (

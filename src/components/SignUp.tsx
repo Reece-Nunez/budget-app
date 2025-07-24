@@ -3,39 +3,57 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supaBaseClient'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 export default function Signup({ toggle }: { toggle: () => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const router = useRouter()
 
   const handleSignup = async () => {
-    if (!email.includes('@')) {
-      return toast.error('Please enter a valid email address.')
+    if (!email.includes('@')) return toast.error('Please enter a valid email address.')
+    if (password.length < 6) return toast.error('Password must be at least 6 characters.')
+
+    // 1) Create the user
+    const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
+    if (signUpError) {
+      return toast.error(signUpError.message)
     }
 
-    if (password.length < 6) {
-      return toast.error('Password must be at least 6 characters.')
+    // 2) Seed the payments table
+    //    `data.user` should exist immediately after signUp
+    if (data.user) {
+      const { error: seedError } =
+        await supabase
+          .from('payments')
+          .upsert(
+            [{
+              user_id: data.user.id,
+              email: data.user.email!,
+              has_paid: false,
+            }],
+            { onConflict: 'user_id' }
+          )
+
+      if (seedError) console.error('❌ failed to seed payments:', seedError)
     }
 
-    const { error } = await supabase.auth.signUp({ email, password })
-
-    if (error) {
-      toast.error(error.message)
-    } else {
-      toast.success('Account created! Check your email to verify.')
-    }
+    toast.success('Account created! Check your email to verify.')
   }
 
   const handleGoogleSignup = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
     })
-
     if (error) {
       toast.error(error.message)
     } else {
-      toast('Redirecting to Google...')
+      toast('Redirecting to Google…')
     }
+    router.push('/dashboard')
   }
 
   return (

@@ -1,9 +1,13 @@
-import type { Metadata } from "next";
+'use client'
+
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthProvider";
 import { Toaster } from "@/components/ui/sonner";
-import { BudgetProvider, useBudget } from "@/lib/budget-store";
+import { BudgetProvider } from "@/lib/budget-store";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,30 +19,45 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Budget App",
-  description: "Manage your budget effectively",
-};
-
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
+  // hydrate the Supabase cookie once on the client
+  useEffect(() => {
+    const supabase = createClientComponentClient();
+    supabase.auth.getSession();
+  }, []);
+
+  // figure out what route we’re on
+  const path = usePathname();
+  const isHome = path === "/";
+
+  // a small wrapper so we don’t repeat the providers
+  const PageWithProviders = (
+    <BudgetProvider>
+      {children}
+      <div id="portal" />
+    </BudgetProvider>
+  );
+
   return (
     <html lang="en">
       <head />
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased relative`}
       >
-        <AuthProvider>
-          <BudgetProvider>
-            <div className="absolute inset-0 z-[-1] bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800" />
-            {children}
-            <div id="portal" />
-          </BudgetProvider>
-          <Toaster position="top-center" richColors />
-        </AuthProvider>
+        {isHome ? (
+          // on home: no AuthProvider
+          PageWithProviders
+        ) : (
+          // everywhere else: wrap in AuthProvider
+          <AuthProvider>
+            {PageWithProviders}
+            <Toaster position="top-center" richColors />
+          </AuthProvider>
+        )}
       </body>
     </html>
   );
